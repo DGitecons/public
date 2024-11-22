@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notícias da Renascença</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        #news-widget {
+            position: relative;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 10px;
+            gap: 20px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #news-widget .progress-container {
+            width: 100px;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #news-widget .progress-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #4c66af, #4ab1c3);
+            transition: width 1s linear;
+            border-radius: 2px;
+        }
+
+        .page-info {
+            display: flex;
+            gap: 8px;
+        }
+
+        .page-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+
+        .page-dot.active {
+            background-color: #4c66af;
+        }
+
+        .news-container {
+            max-width: 100%;
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 16px;
+            padding: 24px;
+            margin: 0 auto;
+            justify-content: center;
+            overflow-x: auto;
+        }
+
+
+        .news-item.active {
+            display: block;
+        }
+
+        .news-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .news-image-container {
+            width: 100%;
+            height: 140px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .news-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .news-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .news-item {
+            display: none;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            height: 520px; /* Aumentado para acomodar o QR code maior */
+            width: 240px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .news-content {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            height: calc(100% - 320px); /* Ajustado para o novo layout */
+        }
+
+        .news-item h3 {
+            font-size: 16px;
+            color: #333;
+            margin: 0;
+            font-weight: bold;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            height: 66px;
+        }
+
+        .news-item p {
+            font-size: 13px;
+            color: #666;
+            margin: 0;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3; /* Reduzido para dar mais espaço ao QR */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            flex-grow: 1;
+            max-height: 60px;
+        }
+
+        .qr-code-container {
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f8f8f8;
+            border-top: 1px solid #eee;
+            height: 140px; /* Aumentado para QR code maior */
+            box-sizing: border-box;
+        }
+
+        .qr-code-wrapper {
+            width: 120px; /* Aumentado */
+            height: 120px; /* Aumentado */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .qr-code-container canvas {
+            width: 120px !important; /* Aumentado */
+            height: 120px !important; /* Aumentado */
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+        }
+
+        .news-item.fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .news-item.fade-out {
+            animation: fadeOut 0.5s ease forwards;
+        }
+    </style>
+</head>
+<body>
+    <div id="news-widget">
+        <div class="page-info" id="pageInfo">
+            <!-- Dots serão adicionados aqui via JavaScript -->
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+    <div class="news-container" id="newsContainer">
+        <!-- Notícias serão carregadas aqui -->
+    </div>
+
+    <script>
+        let allNews = [];
+        let currentBatchIndex = 0;
+        let currentPage = 1;
+        const NEWS_PER_PAGE = 5;
+        const ROTATION_INTERVAL = 10;
+        let countdownInterval;
+
+        function loadRSS() {
+            const rssUrl = 'https://rr.sapo.pt/rss/rssfeed.aspx?section=section_noticias';
+            
+            fetch(rssUrl)
+                .then(response => response.text())
+                .then(data => {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(data, "application/xml");
+
+                    const items = xmlDoc.getElementsByTagName("item");
+
+                    for (let i = 0; i < items.length; i++) {
+                        const title = items[i].getElementsByTagName("title")[0].textContent;
+                        const description = items[i].getElementsByTagName("description")[0].textContent;
+                        const imageUrl = items[i].getElementsByTagName("enclosure")[0]?.getAttribute("url");
+                        const imageType = items[i].getElementsByTagName("enclosure")[0]?.getAttribute("type");
+                        const link = items[i].getElementsByTagName("link")[0].textContent;
+                        
+                        if (imageType !== "video/mp4" && imageType !== "audio/mp3" && imageUrl) {
+                            allNews.push({ title, description, imageUrl, link });
+                        }
+                    }
+
+                    updateNavigationDots();
+                    displayNewsBatch();
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar o RSS:', error);
+                });
+        }
+
+        function generateQRCode(container, link) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'qr-code-wrapper';
+            container.appendChild(wrapper);
+            
+            new QRCode(wrapper, {
+                text: link,
+                width: 120, // Aumentado
+                height: 120, // Aumentado
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        function updateNavigationDots() {
+            const pageInfo = document.getElementById("pageInfo");
+            const totalPages = Math.ceil(allNews.length / NEWS_PER_PAGE);
+            
+            pageInfo.innerHTML = '';
+            
+            for (let i = 0; i < totalPages; i++) {
+                const dot = document.createElement("div");
+                dot.classList.add("page-dot");
+                if (i === currentPage - 1) {
+                    dot.classList.add("active");
+                }
+                pageInfo.appendChild(dot);
+            }
+        }
+
+        function displayNewsBatch() {
+            const newsContainer = document.getElementById("newsContainer");
+            const progressBar = document.getElementById("progressBar");
+
+            const dots = document.querySelectorAll(".page-dot");
+            dots.forEach((dot, index) => {
+                dot.classList.toggle("active", index === currentPage - 1);
+            });
+
+            const existingNews = Array.from(newsContainer.children);
+            existingNews.forEach(news => news.classList.add('fade-out'));
+
+            setTimeout(() => {
+                newsContainer.innerHTML = '';
+
+                for (let i = 0; i < NEWS_PER_PAGE; i++) {
+                    const news = allNews[(currentBatchIndex + i) % allNews.length];
+
+                    const newsItem = document.createElement("div");
+                    newsItem.classList.add("news-item", "active", "fade-in");
+
+                    newsItem.innerHTML = `
+                        <div class="news-image-container">
+                            <img src="${news.imageUrl}" alt="Imagem da notícia" loading="lazy">
+                        </div>
+                        <div class="news-content">
+                            <h3>${news.title}</h3>
+                            <p>${news.description}</p>
+                        </div>
+                        <div class="qr-code-container" id="qr-${currentBatchIndex + i}"></div>
+                    `;
+
+                    newsContainer.appendChild(newsItem);
+                    
+                    generateQRCode(
+                        document.getElementById(`qr-${currentBatchIndex + i}`),
+                        news.link
+                    );
+                }
+
+                currentBatchIndex = (currentBatchIndex + NEWS_PER_PAGE) % allNews.length;
+                currentPage = Math.ceil(currentBatchIndex / NEWS_PER_PAGE) + 1;
+                startCountdown();
+            }, 500);
+        }
+
+        function startCountdown() {
+            const progressBar = document.getElementById("progressBar");
+
+            clearInterval(countdownInterval);
+            progressBar.style.width = "100%";
+
+            countdownInterval = setInterval(() => {
+                const currentWidth = parseFloat(progressBar.style.width);
+                if (currentWidth > 0) {
+                    progressBar.style.width = `${currentWidth - 10}%`;
+                } else {
+                    clearInterval(countdownInterval);
+                    displayNewsBatch();
+                }
+            }, 1000);
+        }
+
+        window.onload = loadRSS;
+    </script>
+</body>
+</html>
